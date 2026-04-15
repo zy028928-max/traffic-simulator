@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Arcade Highway Driving Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #111; }
+    canvas { display: block; margin: auto; background: #2b2b2b; }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="400" height="600"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let gameState = "playing";
+let explosionTime = 0;
+let score = 0;
+
+// 5 LANE HIGHWAY
+const LANES = 5;
+const laneWidth = canvas.width / LANES;
+
+// PLAYER CAR
+let car = {
+  x: canvas.width / 2 - 15,
+  y: canvas.height - 200,
+  width: 28,
+  height: 78,
+  vx: 0,
+  vy: 0,
+  speed: 0.55,
+  friction: 0.82,
+  angle: 0
+};
+
+let keys = {};
+let enemies = [];
+let particles = [];
+
+let lastSpawnY = new Array(LANES).fill(-9999);
+
+function resetGame() {
+  gameState = "playing";
+  explosionTime = 0;
+  score = 0;
+  enemies = [];
+  particles = [];
+  car.x = canvas.width / 2 - 15;
+  car.y = canvas.height - 200;
+  car.vx = 0;
+  car.vy = 0;
+  car.angle = 0;
+  lastSpawnY.fill(-9999);
+}
+
+function spawnEnemy() {
+  const lane = Math.floor(Math.random() * LANES);
+
+  // prevent overlap in same lane
+  if (lastSpawnY[lane] > -120 && lastSpawnY[lane] < 140) return;
+
+  const baseSpeed = 2.2 + Math.random() * 2.2;
+  const difficultyBoost = Math.floor(score / 100);
+
+  const colors = ["blue", "purple", "green", "orange", "cyan"];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+
+  const w = car.width; // SAME WIDTH AS PLAYER CAR (FIXED)
+  const h = 70 + Math.random() * 20;
+
+  const x = lane * laneWidth + laneWidth / 2 - w / 2;
+
+  enemies.push({
+    x,
+    y: -120,
+    width: w,
+    height: h,
+    speed: baseSpeed + difficultyBoost,
+    color,
+    lane
+  });
+
+  lastSpawnY[lane] = 0;
+}
+
+function explode(x, y) {
+  for (let i = 0; i < 80; i++) {
+    particles.push({
+      x,
+      y,
+      vx: (Math.random() - 0.5) * 11,
+      vy: (Math.random() - 0.5) * 11,
+      life: 45
+    });
+  }
+}
+
+function update() {
+  if (gameState !== "playing") return;
+
+  if (keys["ArrowLeft"]) car.vx -= car.speed;
+  if (keys["ArrowRight"]) car.vx += car.speed;
+  if (keys["ArrowUp"]) car.vy -= car.speed;
+  if (keys["ArrowDown"]) car.vy += car.speed;
+
+  car.vx *= car.friction;
+  car.vy *= 0.84;
+
+  car.x += car.vx;
+  car.y += car.vy;
+
+  let targetAngle = car.vx * 0.06;
+  const max = 15 * Math.PI / 180;
+  if (targetAngle > max) targetAngle = max;
+  if (targetAngle < -max) targetAngle = -max;
+  car.angle += (targetAngle - car.angle) * 0.12;
+
+  if (car.x < 0) car.x = 0;
+  if (car.x + car.width > canvas.width) car.x = canvas.width - car.width;
+  if (car.y < 0) car.y = 0;
+  if (car.y + car.height > canvas.height) car.y = canvas.height - car.height;
+
+  for (let i = 0; i < enemies.length; i++) {
+    enemies[i].y += enemies[i].speed;
+
+    lastSpawnY[enemies[i].lane] = enemies[i].y;
+
+    if (
+      car.x < enemies[i].x + enemies[i].width &&
+      car.x + car.width > enemies[i].x &&
+      car.y < enemies[i].y + enemies[i].height &&
+      car.y + car.height > enemies[i].y
+    ) {
+      gameState = "exploding";
+      explode(car.x + car.width / 2, car.y + car.height / 2);
+      explosionTime = 30;
+    }
+
+    if (enemies[i].y > canvas.height) score++;
+  }
+
+  enemies = enemies.filter(e => e.y < canvas.height + 150);
+
+  for (let p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+  }
+  particles = particles.filter(p => p.life > 0);
+
+  if (gameState === "exploding") {
+    explosionTime--;
+    if (explosionTime <= 0) gameState = "gameover";
+  }
+}
+
+function drawRoad() {
+  ctx.fillStyle = "#333";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "white";
+  ctx.setLineDash([18, 14]);
+
+  for (let i = 1; i < LANES; i++) {
+    ctx.beginPath();
+    ctx.moveTo(laneWidth * i, 0);
+    ctx.lineTo(laneWidth * i, canvas.height);
+    ctx.stroke();
+  }
+}
+
+function drawCar() {
+  ctx.save();
+  ctx.translate(car.x + car.width / 2, car.y + car.height / 2);
+  ctx.rotate(car.angle);
+
+  ctx.fillStyle = "red";
+  ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
+
+  ctx.fillStyle = "#bfefff";
+  ctx.fillRect(-car.width / 2 + 4, -car.height / 2 + 10, car.width - 8, 16);
+
+  ctx.fillStyle = "yellow";
+  ctx.fillRect(-car.width / 2 + 3, car.height / 2 - 10, 5, 5);
+  ctx.fillRect(car.width / 2 - 8, car.height / 2 - 10, 5, 5);
+
+  ctx.strokeStyle = "black";
+  ctx.strokeRect(-car.width / 2, -car.height / 2, car.width, car.height);
+
+  ctx.restore();
+}
+
+function drawEnemies() {
+  for (let e of enemies) {
+    ctx.fillStyle = e.color;
+    ctx.fillRect(e.x, e.y, e.width, e.height);
+
+    ctx.fillStyle = "#111";
+    ctx.fillRect(e.x + 5, e.y + 10, e.width - 10, 14);
+  }
+}
+
+function drawParticles() {
+  ctx.fillStyle = "orange";
+  for (let p of particles) {
+    ctx.fillRect(p.x, p.y, 5, 5);
+  }
+}
+
+function drawScore() {
+  ctx.fillStyle = "white";
+  ctx.font = "18px Arial";
+  ctx.fillText("Score: " + score, 10, 25);
+}
+
+function drawGameOver() {
+  if (gameState === "gameover") {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "white";
+    ctx.font = "30px Arial";
+    ctx.fillText("Game Over", 120, 250);
+
+    ctx.font = "22px Arial";
+    ctx.fillText("Score: " + score, 140, 300);
+    ctx.fillText("Press R to Restart", 90, 350);
+  }
+}
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawRoad();
+  update();
+  drawEnemies();
+  drawCar();
+  drawParticles();
+  drawScore();
+  drawGameOver();
+  requestAnimationFrame(gameLoop);
+}
+
+window.addEventListener("keydown", (e) => {
+  keys[e.key] = true;
+  if (e.key.toLowerCase() === "r") resetGame();
+});
+
+window.addEventListener("keyup", (e) => {
+  keys[e.key] = false;
+});
+
+setInterval(() => {
+  if (gameState === "playing") spawnEnemy();
+}, 900);
+
+gameLoop();
+</script>
+</body>
+</html>
