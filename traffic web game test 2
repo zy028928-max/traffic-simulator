@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Arcade Highway Driving Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #111; }
+    canvas { display: block; margin: auto; background: #2b2b2b; }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="400" height="600"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const LANES = 5;
+const laneWidth = canvas.width / LANES;
+
+let gameState = "playing";
+let explosionTime = 0;
+let score = 0;
+
+let roadOffset = 0;
+
+let baseDensity = 6;
+let currentDensity = baseDensity;
+
+let car = {
+  x: canvas.width / 2 - 15,
+  y: canvas.height - 200,
+  width: 38,
+  height: 78,
+  vx: 0,
+  vy: 0,
+  speed: 0.75,
+  friction: 0.82,
+  angle: 0
+};
+
+let keys = {};
+let enemies = [];
+let particles = [];
+
+let lastSpawnY = new Array(LANES).fill(-9999);
+
+function resetGame() {
+  gameState = "playing";
+  explosionTime = 0;
+  score = 0;
+  enemies.length = 0;
+  particles.length = 0;
+
+  car.x = canvas.width / 2 - 15;
+  car.y = canvas.height - 200;
+  car.vx = 0;
+  car.vy = 0;
+  car.angle = 0;
+
+  lastSpawnY.fill(-9999);
+  currentDensity = baseDensity;
+
+  for (let i = 0; i < currentDensity; i++) spawnEnemy();
+}
+
+function spawnEnemy() {
+  const lane = Math.floor(Math.random() * LANES);
+
+  if (lastSpawnY[lane] > -120 && lastSpawnY[lane] < 140) return;
+
+  const speed = Math.random() * (car.speed - 0.2) + 0.2;
+
+  const w = car.width;
+  const h = 70 + Math.random() * 20;
+
+  enemies.push({
+    x: lane * laneWidth + laneWidth / 2 - w / 2,
+    y: -120,
+    width: w,
+    height: h,
+    speed,
+    color: ["blue","purple","green","orange","cyan"][Math.random()*5|0],
+    lane
+  });
+
+  lastSpawnY[lane] = 0;
+}
+
+function explode(x, y) {
+  for (let i = 0; i < 80; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 11,
+      vy: (Math.random() - 0.5) * 11,
+      life: 45
+    });
+  }
+}
+
+function update() {
+  if (gameState !== "playing") return;
+
+  // input
+  if (keys["ArrowLeft"]) car.vx -= car.speed;
+  if (keys["ArrowRight"]) car.vx += car.speed;
+  if (keys["ArrowUp"]) car.vy -= car.speed;
+  if (keys["ArrowDown"]) car.vy += car.speed;
+
+  car.vx *= car.friction;
+  car.vy *= 0.84;
+
+  car.x += car.vx;
+  car.y += car.vy;
+
+  // rotation
+  let targetAngle = Math.max(-0.26, Math.min(0.26, car.vx * 0.06));
+  car.angle += (targetAngle - car.angle) * 0.12;
+
+  // bounds
+  car.x = Math.max(0, Math.min(canvas.width - car.width, car.x));
+  car.y = Math.max(0, Math.min(canvas.height - car.height, car.y));
+
+  // enemies (single loop)
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    let e = enemies[i];
+    e.y += e.speed;
+
+    lastSpawnY[e.lane] = e.y;
+
+    // collision
+    if (
+      car.x < e.x + e.width &&
+      car.x + car.width > e.x &&
+      car.y < e.y + e.height &&
+      car.y + car.height > e.y
+    ) {
+      gameState = "exploding";
+      explode(car.x + car.width / 2, car.y + car.height / 2);
+      explosionTime = 30;
+    }
+
+    // passed screen
+    if (e.y > canvas.height) {
+      score++;
+      if (score % 1000 === 0) {
+        currentDensity = Math.floor(currentDensity * 1.1);
+      }
+      enemies.splice(i, 1);
+    }
+  }
+
+  // maintain density
+  while (enemies.length < currentDensity) spawnEnemy();
+
+  // particles (single loop)
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    if (--p.life <= 0) particles.splice(i, 1);
+  }
+
+  if (gameState === "exploding") {
+    if (--explosionTime <= 0) gameState = "gameover";
+  }
+}
+
+function drawRoad() {
+  ctx.fillStyle = "#333";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "white";
+  ctx.setLineDash([18, 14]);
+
+  if (gameState === "playing") roadOffset += 2;
+  ctx.lineDashOffset = -roadOffset;
+
+  for (let i = 1; i < LANES; i++) {
+    ctx.beginPath();
+    ctx.moveTo(laneWidth * i, 0);
+    ctx.lineTo(laneWidth * i, canvas.height);
+    ctx.stroke();
+  }
+}
+
+function drawCar() {
+  ctx.save();
+  ctx.translate(car.x + car.width / 2, car.y + car.height / 2);
+  ctx.rotate(car.angle);
+
+  ctx.fillStyle = "red";
+  ctx.fillRect(-car.width/2, -car.height/2, car.width, car.height);
+
+  ctx.fillStyle = "#bfefff";
+  ctx.fillRect(-car.width/2+4, -car.height/2+10, car.width-8, 16);
+
+  ctx.fillStyle = "yellow";
+  ctx.fillRect(-car.width/2+3, car.height/2-10, 5, 5);
+  ctx.fillRect(car.width/2-8, car.height/2-10, 5, 5);
+
+  ctx.strokeStyle = "black";
+  ctx.strokeRect(-car.width/2, -car.height/2, car.width, car.height);
+
+  ctx.restore();
+}
+
+function drawEnemies() {
+  for (let e of enemies) {
+    ctx.fillStyle = e.color;
+    ctx.fillRect(e.x, e.y, e.width, e.height);
+
+    ctx.fillStyle = "#111";
+    ctx.fillRect(e.x + 5, e.y + 10, e.width - 10, 14);
+  }
+}
+
+function drawParticles() {
+  ctx.fillStyle = "orange";
+  for (let p of particles) ctx.fillRect(p.x, p.y, 5, 5);
+}
+
+function drawScore() {
+  ctx.fillStyle = "white";
+  ctx.font = "18px Arial";
+  ctx.fillText("Score: " + score, 10, 25);
+}
+
+function drawGameOver() {
+  if (gameState !== "gameover") return;
+
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "white";
+  ctx.font = "30px Arial";
+  ctx.fillText("Game Over", 120, 250);
+
+  ctx.font = "22px Arial";
+  ctx.fillText("Score: " + score, 140, 300);
+  ctx.fillText("Press R to Restart", 90, 350);
+}
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawRoad();
+  update();
+  drawEnemies();
+  drawCar();
+  drawParticles();
+  drawScore();
+  drawGameOver();
+  requestAnimationFrame(gameLoop);
+}
+
+window.addEventListener("keydown", e => {
+  keys[e.key] = true;
+  if (e.key.toLowerCase() === "r") resetGame();
+});
+
+window.addEventListener("keyup", e => {
+  keys[e.key] = false;
+});
+
+resetGame();
+gameLoop();
+</script>
+</body>
+</html>
