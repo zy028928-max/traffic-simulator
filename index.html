@@ -6,7 +6,6 @@
   <style>
     body { margin: 0; overflow: hidden; background: #111; }
 
-    /* ❌ BORDER REMOVED (invisible bounds only now) */
     canvas {
       display: block;
       margin: auto;
@@ -35,10 +34,11 @@ const roadSpeed = 4;
 const LANES = 5;
 const laneWidth = canvas.width / LANES;
 
-// DENSITY
+// 🚦 UPDATED DENSITY SYSTEM (NOW +2 per 500 score)
 let maxDensity = 6;
+
 function updateDensity() {
-  maxDensity = 6 + Math.floor(score / 500);
+  maxDensity = 6 + Math.floor(score / 500) * 2;
 }
 
 // PLAYER
@@ -138,7 +138,7 @@ function explode(x, y) {
 function update() {
   if (gameState !== "playing") return;
 
-  updateDensity();
+  updateDensity(); // ✅ IMPORTANT
   roadOffset += roadSpeed;
 
   if (keys["ArrowLeft"]) car.vx -= car.speed;
@@ -157,25 +157,10 @@ function update() {
   targetAngle = Math.max(-max, Math.min(max, targetAngle));
   car.angle += (targetAngle - car.angle) * 0.12;
 
-  // 🚫 HARD SCREEN LOCK (fully prevents leaving screen)
-  if (car.x < 0) {
-    car.x = 0;
-    car.vx = 0;
-  }
-  if (car.x > canvas.width - car.width) {
-    car.x = canvas.width - car.width;
-    car.vx = 0;
-  }
-  if (car.y < 0) {
-    car.y = 0;
-    car.vy = 0;
-  }
-  if (car.y > canvas.height - car.height) {
-    car.y = canvas.height - car.height;
-    car.vy = 0;
-  }
+  // HARD BOUNDS
+  car.x = Math.max(0, Math.min(canvas.width - car.width, car.x));
+  car.y = Math.max(0, Math.min(canvas.height - car.height, car.y));
 
-  // ENEMIES
   for (let i = 0; i < enemies.length; i++) {
     enemies[i].y += enemies[i].speed;
     lastSpawnY[enemies[i].lane] = enemies[i].y;
@@ -191,7 +176,9 @@ function update() {
       explosionTime = 30;
     }
 
-    if (enemies[i].y > canvas.height) score++;
+    if (enemies[i].y > canvas.height) {
+      score++;
+    }
   }
 
   enemies = enemies.filter(e => e.y < canvas.height + 150);
@@ -296,7 +283,7 @@ window.addEventListener("keyup", (e) => {
   keys[e.key] = false;
 });
 
-// SPAWN CONTROL
+// SPAWN SYSTEM
 setInterval(() => {
   if (gameState !== "playing") return;
 
