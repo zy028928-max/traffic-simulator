@@ -22,11 +22,11 @@ let score = 0;
 const LANES = 5;
 const laneWidth = canvas.width / LANES;
 
-// PLAYER CAR
+// PLAYER CAR (increased by +4 total width)
 let car = {
   x: canvas.width / 2 - 15,
   y: canvas.height - 200,
-  width: 28,
+  width: 38,
   height: 78,
   vx: 0,
   vy: 0,
@@ -58,7 +58,6 @@ function resetGame() {
 function spawnEnemy() {
   const lane = Math.floor(Math.random() * LANES);
 
-  // prevent overlap in same lane
   if (lastSpawnY[lane] > -120 && lastSpawnY[lane] < 140) return;
 
   const baseSpeed = 2.2 + Math.random() * 2.2;
@@ -67,7 +66,7 @@ function spawnEnemy() {
   const colors = ["blue", "purple", "green", "orange", "cyan"];
   const color = colors[Math.floor(Math.random() * colors.length)];
 
-  const w = car.width; // SAME WIDTH AS PLAYER CAR (FIXED)
+  const w = car.width;
   const h = 70 + Math.random() * 20;
 
   const x = lane * laneWidth + laneWidth / 2 - w / 2;
