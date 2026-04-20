@@ -5,11 +5,19 @@
   <title>Arcade Highway Driving Game</title>
   <style>
     body { margin: 0; overflow: hidden; background: #111; }
-    canvas { display: block; margin: auto; background: #2b2b2b; }
+
+    canvas {
+      display: block;
+      margin: auto;
+      background: #2b2b2b;
+      border: none;
+    }
   </style>
 </head>
 <body>
+
 <canvas id="gameCanvas" width="400" height="600"></canvas>
+
 <script>
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
@@ -18,19 +26,30 @@ let gameState = "playing";
 let explosionTime = 0;
 let score = 0;
 
-// 5 LANE HIGHWAY
+// ROAD
+let roadOffset = 0;
+const roadSpeed = 4;
+
+// LANES
 const LANES = 5;
 const laneWidth = canvas.width / LANES;
 
-// PLAYER CAR (increased by +4 total width)
+// 🚦 UPDATED DENSITY SYSTEM (NOW +2 per 500 score)
+let maxDensity = 6;
+
+function updateDensity() {
+  maxDensity = 6 + Math.floor(score / 500) * 2;
+}
+
+// PLAYER
 let car = {
   x: canvas.width / 2 - 15,
   y: canvas.height - 200,
   width: 38,
-  height: 78,
+  height: 74,
   vx: 0,
   vy: 0,
-  speed: 0.55,
+  speed: 1,
   friction: 0.82,
   angle: 0
 };
@@ -38,9 +57,9 @@ let car = {
 let keys = {};
 let enemies = [];
 let particles = [];
-
 let lastSpawnY = new Array(LANES).fill(-9999);
 
+// RESET
 function resetGame() {
   gameState = "playing";
   explosionTime = 0;
@@ -53,15 +72,33 @@ function resetGame() {
   car.vy = 0;
   car.angle = 0;
   lastSpawnY.fill(-9999);
+  maxDensity = 6;
 }
 
+// SPEED BALANCER
+function generateUniqueSpeed(existingSpeeds) {
+  let speed;
+  let tries = 0;
+
+  do {
+    speed = 5 + Math.random() * 2.5;
+    tries++;
+  } while (
+    existingSpeeds.some(s => Math.abs(s - speed) < 0.5) &&
+    tries < 10
+  );
+
+  return speed;
+}
+
+// SPAWN
 function spawnEnemy() {
   const lane = Math.floor(Math.random() * LANES);
 
   if (lastSpawnY[lane] > -120 && lastSpawnY[lane] < 140) return;
 
-  const baseSpeed = 2.2 + Math.random() * 2.2;
-  const difficultyBoost = Math.floor(score / 100);
+  const recentSpeeds = enemies.slice(-LANES).map(e => e.speed);
+  const speed = generateUniqueSpeed(recentSpeeds);
 
   const colors = ["blue", "purple", "green", "orange", "cyan"];
   const color = colors[Math.floor(Math.random() * colors.length)];
@@ -76,7 +113,7 @@ function spawnEnemy() {
     y: -120,
     width: w,
     height: h,
-    speed: baseSpeed + difficultyBoost,
+    speed,
     color,
     lane
   });
@@ -84,6 +121,7 @@ function spawnEnemy() {
   lastSpawnY[lane] = 0;
 }
 
+// EXPLOSION
 function explode(x, y) {
   for (let i = 0; i < 80; i++) {
     particles.push({
@@ -96,8 +134,12 @@ function explode(x, y) {
   }
 }
 
+// UPDATE
 function update() {
   if (gameState !== "playing") return;
+
+  updateDensity(); // ✅ IMPORTANT
+  roadOffset += roadSpeed;
 
   if (keys["ArrowLeft"]) car.vx -= car.speed;
   if (keys["ArrowRight"]) car.vx += car.speed;
@@ -112,18 +154,15 @@ function update() {
 
   let targetAngle = car.vx * 0.06;
   const max = 15 * Math.PI / 180;
-  if (targetAngle > max) targetAngle = max;
-  if (targetAngle < -max) targetAngle = -max;
+  targetAngle = Math.max(-max, Math.min(max, targetAngle));
   car.angle += (targetAngle - car.angle) * 0.12;
 
-  if (car.x < 0) car.x = 0;
-  if (car.x + car.width > canvas.width) car.x = canvas.width - car.width;
-  if (car.y < 0) car.y = 0;
-  if (car.y + car.height > canvas.height) car.y = canvas.height - car.height;
+  // HARD BOUNDS
+  car.x = Math.max(0, Math.min(canvas.width - car.width, car.x));
+  car.y = Math.max(0, Math.min(canvas.height - car.height, car.y));
 
   for (let i = 0; i < enemies.length; i++) {
     enemies[i].y += enemies[i].speed;
-
     lastSpawnY[enemies[i].lane] = enemies[i].y;
 
     if (
@@ -137,7 +176,9 @@ function update() {
       explosionTime = 30;
     }
 
-    if (enemies[i].y > canvas.height) score++;
+    if (enemies[i].y > canvas.height) {
+      score++;
+    }
   }
 
   enemies = enemies.filter(e => e.y < canvas.height + 150);
@@ -155,12 +196,14 @@ function update() {
   }
 }
 
+// ROAD
 function drawRoad() {
   ctx.fillStyle = "#333";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.strokeStyle = "white";
   ctx.setLineDash([18, 14]);
+  ctx.lineDashOffset = -roadOffset;
 
   for (let i = 1; i < LANES; i++) {
     ctx.beginPath();
@@ -170,6 +213,7 @@ function drawRoad() {
   }
 }
 
+// CAR
 function drawCar() {
   ctx.save();
   ctx.translate(car.x + car.width / 2, car.y + car.height / 2);
@@ -185,12 +229,10 @@ function drawCar() {
   ctx.fillRect(-car.width / 2 + 3, car.height / 2 - 10, 5, 5);
   ctx.fillRect(car.width / 2 - 8, car.height / 2 - 10, 5, 5);
 
-  ctx.strokeStyle = "black";
-  ctx.strokeRect(-car.width / 2, -car.height / 2, car.width, car.height);
-
   ctx.restore();
 }
 
+// ENEMIES
 function drawEnemies() {
   for (let e of enemies) {
     ctx.fillStyle = e.color;
@@ -198,9 +240,13 @@ function drawEnemies() {
 
     ctx.fillStyle = "#111";
     ctx.fillRect(e.x + 5, e.y + 10, e.width - 10, 14);
+
+    ctx.fillStyle = "#cfefff";
+    ctx.fillRect(e.x + 4, e.y + 12, e.width - 8, 10);
   }
 }
 
+// PARTICLES
 function drawParticles() {
   ctx.fillStyle = "orange";
   for (let p of particles) {
@@ -208,27 +254,14 @@ function drawParticles() {
   }
 }
 
+// SCORE
 function drawScore() {
   ctx.fillStyle = "white";
   ctx.font = "18px Arial";
   ctx.fillText("Score: " + score, 10, 25);
 }
 
-function drawGameOver() {
-  if (gameState === "gameover") {
-    ctx.fillStyle = "rgba(0,0,0,0.7)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = "white";
-    ctx.font = "30px Arial";
-    ctx.fillText("Game Over", 120, 250);
-
-    ctx.font = "22px Arial";
-    ctx.fillText("Score: " + score, 140, 300);
-    ctx.fillText("Press R to Restart", 90, 350);
-  }
-}
-
+// LOOP
 function gameLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawRoad();
@@ -237,10 +270,10 @@ function gameLoop() {
   drawCar();
   drawParticles();
   drawScore();
-  drawGameOver();
   requestAnimationFrame(gameLoop);
 }
 
+// INPUT
 window.addEventListener("keydown", (e) => {
   keys[e.key] = true;
   if (e.key.toLowerCase() === "r") resetGame();
@@ -250,11 +283,17 @@ window.addEventListener("keyup", (e) => {
   keys[e.key] = false;
 });
 
+// SPAWN SYSTEM
 setInterval(() => {
-  if (gameState === "playing") spawnEnemy();
+  if (gameState !== "playing") return;
+
+  if (enemies.length < maxDensity) {
+    spawnEnemy();
+  }
 }, 900);
 
 gameLoop();
 </script>
+
 </body>
 </html>
