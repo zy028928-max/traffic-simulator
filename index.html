@@ -29,21 +29,11 @@ let score = 0;
 
 // ROAD
 let roadOffset = 0;
-const roadSpeed = 4;
+let roadSpeed = 4;
 
 // LANES
 const LANES = 5;
 const laneWidth = canvas.width / LANES;
-
-// SCALING
-let maxDensity = 6;
-let trafficSpeedBoost = 0;
-
-function updateScaling() {
-  const level = Math.floor(score / 500);
-  maxDensity = 6 + level * 2;
-  trafficSpeedBoost = level * 0.25;
-}
 
 // PLAYER
 let car = {
@@ -63,6 +53,8 @@ let enemies = [];
 let coins = [];
 let particles = [];
 
+let lastLane = -1;
+
 // RESET
 function resetGame() {
   gameState = "playing";
@@ -71,16 +63,18 @@ function resetGame() {
   enemies = [];
   coins = [];
   particles = [];
+
   car.x = canvas.width / 2 - 18;
   car.y = canvas.height - 200;
   car.vx = 0;
   car.vy = 0;
   car.angle = 0;
-  maxDensity = 6;
-  trafficSpeedBoost = 0;
+
+  roadSpeed = 4;
+  lastLane = -1;
 }
 
-// SPEED
+// SPEED RANDOMIZER (UNCHANGED)
 function generateUniqueSpeed(existingSpeeds) {
   let speed;
   let tries = 0;
@@ -98,7 +92,14 @@ function generateUniqueSpeed(existingSpeeds) {
 
 // 🚗 TRAFFIC
 function spawnEnemy() {
-  const lane = Math.floor(Math.random() * LANES);
+
+  // make sure next car is NOT same lane
+  let lane;
+  do {
+    lane = Math.floor(Math.random() * LANES);
+  } while (lane === lastLane);
+
+  lastLane = lane;
 
   const recentSpeeds = enemies.slice(-LANES).map(e => e.speed);
   const baseSpeed = generateUniqueSpeed(recentSpeeds);
@@ -115,13 +116,14 @@ function spawnEnemy() {
     y: -120,
     width: w,
     height: h,
+    baseSpeed: baseSpeed,
     speed: baseSpeed,
     color: colors[Math.floor(Math.random() * colors.length)],
     lane
   });
 }
 
-// 🪙 COINS (VERTICAL COLUMN)
+// 🪙 COINS
 function spawnCoinColumn() {
   const lane = Math.floor(Math.random() * LANES);
   const count = 3 + Math.floor(Math.random() * 4);
@@ -150,9 +152,12 @@ function explode(x, y) {
 
 // UPDATE
 function update() {
+
   if (gameState !== "playing") return;
 
-  updateScaling();
+  // increase speed every 1000 score
+  roadSpeed = 4 + Math.floor(score / 1000) * 0.5;
+
   roadOffset += roadSpeed;
 
   // PLAYER
@@ -169,6 +174,7 @@ function update() {
 
   let targetAngle = car.vx * 0.06;
   const max = 15 * Math.PI / 180;
+
   targetAngle = Math.max(-max, Math.min(max, targetAngle));
   car.angle += (targetAngle - car.angle) * 0.12;
 
@@ -177,13 +183,47 @@ function update() {
 
   // ENEMIES
   for (let i = 0; i < enemies.length; i++) {
-    enemies[i].y += enemies[i].speed + trafficSpeedBoost;
 
+    let enemy = enemies[i];
+
+    // reset speed to original
+    enemy.speed = enemy.baseSpeed;
+
+    // check for car ahead in same lane
+    for (let j = 0; j < enemies.length; j++) {
+
+      if (i === j) continue;
+
+      let frontCar = enemies[j];
+
+      if (
+        enemy.lane === frontCar.lane &&
+        frontCar.y > enemy.y
+      ) {
+
+        // distance between cars
+        const gap = frontCar.y - (enemy.y + enemy.height);
+
+        // keep 5 pixel gap
+        if (gap < 5) {
+          enemy.y = frontCar.y - enemy.height - 5;
+        }
+
+        // slow down if close
+        if (gap < 80) {
+          enemy.speed = Math.min(enemy.speed, frontCar.speed);
+        }
+      }
+    }
+
+    enemy.y += enemy.speed;
+
+    // collision
     if (
-      car.x < enemies[i].x + enemies[i].width &&
-      car.x + car.width > enemies[i].x &&
-      car.y < enemies[i].y + enemies[i].height &&
-      car.y + car.height > enemies[i].y
+      car.x < enemy.x + enemy.width &&
+      car.x + car.width > enemy.x &&
+      car.y < enemy.y + enemy.height &&
+      car.y + car.height > enemy.y
     ) {
       gameState = "exploding";
       explode(car.x + car.width / 2, car.y + car.height / 2);
@@ -195,6 +235,7 @@ function update() {
 
   // 🪙 COINS
   for (let i = 0; i < coins.length; i++) {
+
     coins[i].y += 7;
 
     if (
@@ -217,17 +258,23 @@ function update() {
     p.y += p.vy;
     p.life--;
   }
+
   particles = particles.filter(p => p.life > 0);
 
   if (gameState === "exploding") {
     explosionTime--;
-    if (explosionTime <= 0) gameState = "gameover";
+
+    if (explosionTime <= 0) {
+      gameState = "gameover";
+    }
   }
 }
 
 // ROAD
 function drawRoad() {
+
   let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+
   grad.addColorStop(0, "#2b2b2b");
   grad.addColorStop(1, "#121212");
 
@@ -250,22 +297,40 @@ function drawRoad() {
 
 // PLAYER
 function drawCar() {
+
   ctx.save();
-  ctx.translate(car.x + car.width / 2, car.y + car.height / 2);
+
+  ctx.translate(
+    car.x + car.width / 2,
+    car.y + car.height / 2
+  );
+
   ctx.rotate(car.angle);
 
   ctx.fillStyle = "#ff1e1e";
-  ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
+  ctx.fillRect(
+    -car.width / 2,
+    -car.height / 2,
+    car.width,
+    car.height
+  );
 
   ctx.fillStyle = "#9be7ff";
-  ctx.fillRect(-car.width / 2 + 5, -car.height / 2 + 12, car.width - 10, 18);
+  ctx.fillRect(
+    -car.width / 2 + 5,
+    -car.height / 2 + 12,
+    car.width - 10,
+    18
+  );
 
   ctx.restore();
 }
 
 // ENEMIES
 function drawEnemies() {
+
   for (let e of enemies) {
+
     ctx.fillStyle = e.color;
     ctx.fillRect(e.x, e.y, e.width, e.height);
 
@@ -283,8 +348,11 @@ function drawEnemies() {
 
 // COINS
 function drawCoins() {
+
   for (let c of coins) {
+
     ctx.fillStyle = "#ffd700";
+
     ctx.beginPath();
     ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
     ctx.fill();
@@ -293,7 +361,9 @@ function drawCoins() {
 
 // PARTICLES
 function drawParticles() {
+
   ctx.fillStyle = "orange";
+
   for (let p of particles) {
     ctx.fillRect(p.x, p.y, 4, 4);
   }
@@ -301,6 +371,7 @@ function drawParticles() {
 
 // SCORE
 function drawScore() {
+
   ctx.fillStyle = "white";
   ctx.font = "18px Arial";
   ctx.fillText("Score: " + score, 10, 25);
@@ -308,6 +379,7 @@ function drawScore() {
 
 // LOOP
 function gameLoop() {
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   drawRoad();
@@ -323,34 +395,48 @@ function gameLoop() {
 
 // INPUT
 window.addEventListener("keydown", (e) => {
+
   keys[e.key] = true;
-  if (e.key.toLowerCase() === "r") resetGame();
+
+  if (e.key.toLowerCase() === "r") {
+    resetGame();
+  }
 });
 
 window.addEventListener("keyup", (e) => {
   keys[e.key] = false;
 });
 
-// SPAWN ENEMIES
+// 🚗 SPAWN TRAFFIC EVERY 0.5 SECONDS
 setInterval(() => {
-  if (gameState !== "playing") return;
-  if (enemies.length < maxDensity) spawnEnemy();
-}, 900);
 
-// 🪙 COINS (10–15 seconds)
-setInterval(() => {
   if (gameState !== "playing") return;
 
-  const delay = 10000 + Math.random() * 5000;
-  setTimeout(() => {
-    if (gameState === "playing") spawnCoinColumn();
-  }, delay);
+  spawnEnemy();
 
-}, 12000);
+}, 500);
 
-// SCORE (reduced)
+// 🪙 COINS EVERY 5–10 SECONDS
+function coinLoop() {
+
+  if (gameState === "playing") {
+    spawnCoinColumn();
+  }
+
+  const nextTime = 5000 + Math.random() * 5000;
+
+  setTimeout(coinLoop, nextTime);
+}
+
+coinLoop();
+
+// SCORE
 setInterval(() => {
-  if (gameState === "playing") score += 1;
+
+  if (gameState === "playing") {
+    score += 1;
+  }
+
 }, 100);
 
 gameLoop();
