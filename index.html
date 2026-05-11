@@ -93,7 +93,6 @@ function generateUniqueSpeed(existingSpeeds) {
 // 🚗 TRAFFIC
 function spawnEnemy() {
 
-  // make sure next car is NOT same lane
   let lane;
   do {
     lane = Math.floor(Math.random() * LANES);
@@ -155,8 +154,8 @@ function update() {
 
   if (gameState !== "playing") return;
 
-  // increase speed every 1000 score
-  roadSpeed = 4 + Math.floor(score / 1000) * 0.5;
+  // ✅ CHANGE 1: speed increases every 500 score
+  roadSpeed = 4 + Math.floor(score / 500) * 0.5;
 
   roadOffset += roadSpeed;
 
@@ -186,10 +185,8 @@ function update() {
 
     let enemy = enemies[i];
 
-    // reset speed to original
     enemy.speed = enemy.baseSpeed;
 
-    // check for car ahead in same lane
     for (let j = 0; j < enemies.length; j++) {
 
       if (i === j) continue;
@@ -201,15 +198,12 @@ function update() {
         frontCar.y > enemy.y
       ) {
 
-        // distance between cars
         const gap = frontCar.y - (enemy.y + enemy.height);
 
-        // keep 5 pixel gap
         if (gap < 5) {
           enemy.y = frontCar.y - enemy.height - 5;
         }
 
-        // slow down if close
         if (gap < 80) {
           enemy.speed = Math.min(enemy.speed, frontCar.speed);
         }
@@ -218,7 +212,6 @@ function update() {
 
     enemy.y += enemy.speed;
 
-    // collision
     if (
       car.x < enemy.x + enemy.width &&
       car.x + car.width > enemy.x &&
@@ -244,7 +237,8 @@ function update() {
       car.y + 2 < coins[i].y + coins[i].r &&
       car.y + car.height - 2 > coins[i].y - coins[i].r
     ) {
-      score += 10;
+      // ✅ CHANGE 2: coins give 25 score
+      score += 25;
       coins.splice(i, 1);
       i--;
     }
@@ -252,7 +246,6 @@ function update() {
 
   coins = coins.filter(c => c.y < canvas.height + 50);
 
-  // PARTICLES
   for (let p of particles) {
     p.x += p.vx;
     p.y += p.vy;
@@ -295,7 +288,7 @@ function drawRoad() {
   ctx.setLineDash([]);
 }
 
-// PLAYER
+// PLAYER (UNCHANGED VISUALS)
 function drawCar() {
 
   ctx.save();
@@ -326,7 +319,7 @@ function drawCar() {
   ctx.restore();
 }
 
-// ENEMIES
+// ENEMIES (UNCHANGED)
 function drawEnemies() {
 
   for (let e of enemies) {
@@ -407,7 +400,7 @@ window.addEventListener("keyup", (e) => {
   keys[e.key] = false;
 });
 
-// 🚗 SPAWN TRAFFIC EVERY 0.5 SECONDS
+// 🚗 TRAFFIC SPAWN
 setInterval(() => {
 
   if (gameState !== "playing") return;
@@ -416,15 +409,14 @@ setInterval(() => {
 
 }, 500);
 
-// 🪙 COINS EVERY 5–10 SECONDS
+// 🪙 COINS (CHANGE 3: 3–8 seconds)
 function coinLoop() {
 
   if (gameState === "playing") {
     spawnCoinColumn();
   }
 
-  const nextTime = 5000 + Math.random() * 5000;
-
+  const nextTime = 3000 + Math.random() * 5000;
   setTimeout(coinLoop, nextTime);
 }
 
