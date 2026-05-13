@@ -27,6 +27,9 @@ let gameState = "playing";
 let explosionTime = 0;
 let score = 0;
 
+// HIGH SCORE
+let highScore = localStorage.getItem("highScore") || 0;
+
 // ROAD
 let roadOffset = 0;
 let roadSpeed = 4;
@@ -74,7 +77,7 @@ function resetGame() {
   lastLane = -1;
 }
 
-// SPEED RANDOMIZER (UNCHANGED)
+// SPEED RANDOMIZER
 function generateUniqueSpeed(existingSpeeds) {
   let speed;
   let tries = 0;
@@ -90,7 +93,7 @@ function generateUniqueSpeed(existingSpeeds) {
   return speed;
 }
 
-// 🚗 TRAFFIC
+// TRAFFIC
 function spawnEnemy() {
 
   let lane;
@@ -122,7 +125,7 @@ function spawnEnemy() {
   });
 }
 
-// 🪙 COINS
+// COINS
 function spawnCoinColumn() {
   const lane = Math.floor(Math.random() * LANES);
   const count = 3 + Math.floor(Math.random() * 4);
@@ -136,7 +139,7 @@ function spawnCoinColumn() {
   }
 }
 
-// 💥 EXPLOSION
+// EXPLOSION
 function explode(x, y) {
   for (let i = 0; i < 90; i++) {
     particles.push({
@@ -154,7 +157,7 @@ function update() {
 
   if (gameState !== "playing") return;
 
-  // ✅ CHANGE 1: speed increases every 500 score
+  // SPEED INCREASES EVERY 500 SCORE
   roadSpeed = 4 + Math.floor(score / 500) * 0.5;
 
   roadOffset += roadSpeed;
@@ -226,7 +229,7 @@ function update() {
 
   enemies = enemies.filter(e => e.y < canvas.height + 150);
 
-  // 🪙 COINS
+  // COINS
   for (let i = 0; i < coins.length; i++) {
 
     coins[i].y += 7;
@@ -237,8 +240,16 @@ function update() {
       car.y + 2 < coins[i].y + coins[i].r &&
       car.y + car.height - 2 > coins[i].y - coins[i].r
     ) {
-      // ✅ CHANGE 2: coins give 25 score
-      score += 25;
+
+      // COINS GIVE 15 SCORE
+      score += 15;
+
+      // UPDATE HIGH SCORE
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem("highScore", highScore);
+      }
+
       coins.splice(i, 1);
       i--;
     }
@@ -253,6 +264,12 @@ function update() {
   }
 
   particles = particles.filter(p => p.life > 0);
+
+  // UPDATE HIGH SCORE
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem("highScore", highScore);
+  }
 
   if (gameState === "exploding") {
     explosionTime--;
@@ -288,7 +305,7 @@ function drawRoad() {
   ctx.setLineDash([]);
 }
 
-// PLAYER (UNCHANGED VISUALS)
+// PLAYER
 function drawCar() {
 
   ctx.save();
@@ -319,7 +336,7 @@ function drawCar() {
   ctx.restore();
 }
 
-// ENEMIES (UNCHANGED)
+// ENEMIES
 function drawEnemies() {
 
   for (let e of enemies) {
@@ -366,8 +383,22 @@ function drawParticles() {
 function drawScore() {
 
   ctx.fillStyle = "white";
-  ctx.font = "18px Arial";
-  ctx.fillText("Score: " + score, 10, 25);
+
+  // SLIGHTLY SMALLER TEXT
+  ctx.font = "15px Arial";
+
+  // SCORE TOP LEFT
+  ctx.fillText("Score: " + score, 10, 22);
+
+  // HIGH SCORE TOP RIGHT
+  const highScoreText = "High Score: " + highScore;
+  const textWidth = ctx.measureText(highScoreText).width;
+
+  ctx.fillText(
+    highScoreText,
+    canvas.width - textWidth - 10,
+    22
+  );
 }
 
 // LOOP
@@ -400,7 +431,7 @@ window.addEventListener("keyup", (e) => {
   keys[e.key] = false;
 });
 
-// 🚗 TRAFFIC SPAWN
+// TRAFFIC SPAWN
 setInterval(() => {
 
   if (gameState !== "playing") return;
@@ -409,7 +440,7 @@ setInterval(() => {
 
 }, 500);
 
-// 🪙 COINS (CHANGE 3: 3–8 seconds)
+// COINS
 function coinLoop() {
 
   if (gameState === "playing") {
@@ -426,7 +457,14 @@ coinLoop();
 setInterval(() => {
 
   if (gameState === "playing") {
+
     score += 1;
+
+    // UPDATE HIGH SCORE
+    if (score > highScore) {
+      highScore = score;
+      localStorage.setItem("highScore", highScore);
+    }
   }
 
 }, 100);
