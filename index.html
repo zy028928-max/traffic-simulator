@@ -4,7 +4,11 @@
   <meta charset="UTF-8">
   <title>Arcade Highway Driving Game</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #0e0e0e; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #0e0e0e;
+    }
 
     canvas {
       display: block;
@@ -97,6 +101,7 @@ function generateUniqueSpeed(existingSpeeds) {
 function spawnEnemy() {
 
   let lane;
+
   do {
     lane = Math.floor(Math.random() * LANES);
   } while (lane === lastLane);
@@ -106,7 +111,13 @@ function spawnEnemy() {
   const recentSpeeds = enemies.slice(-LANES).map(e => e.speed);
   const baseSpeed = generateUniqueSpeed(recentSpeeds);
 
-  const colors = ["#2f6bff", "#a855f7", "#22c55e", "#f97316", "#06b6d4"];
+  const colors = [
+    "#2f6bff",
+    "#a855f7",
+    "#22c55e",
+    "#f97316",
+    "#06b6d4"
+  ];
 
   const w = car.width;
   const h = 74 + Math.random() * 10;
@@ -127,10 +138,12 @@ function spawnEnemy() {
 
 // COINS
 function spawnCoinColumn() {
+
   const lane = Math.floor(Math.random() * LANES);
   const count = 3 + Math.floor(Math.random() * 4);
 
   for (let i = 0; i < count; i++) {
+
     coins.push({
       x: lane * laneWidth + laneWidth / 2,
       y: -i * 50,
@@ -141,7 +154,9 @@ function spawnCoinColumn() {
 
 // EXPLOSION
 function explode(x, y) {
+
   for (let i = 0; i < 90; i++) {
+
     particles.push({
       x,
       y,
@@ -188,7 +203,8 @@ function update() {
 
     let enemy = enemies[i];
 
-    enemy.speed = enemy.baseSpeed;
+    // ALWAYS KEEP TRAFFIC FASTER THAN ROAD
+    enemy.speed = Math.max(enemy.baseSpeed, roadSpeed + 0.6);
 
     for (let j = 0; j < enemies.length; j++) {
 
@@ -244,7 +260,6 @@ function update() {
       // COINS GIVE 15 SCORE
       score += 15;
 
-      // UPDATE HIGH SCORE
       if (score > highScore) {
         highScore = score;
         localStorage.setItem("highScore", highScore);
@@ -257,6 +272,7 @@ function update() {
 
   coins = coins.filter(c => c.y < canvas.height + 50);
 
+  // PARTICLES
   for (let p of particles) {
     p.x += p.vx;
     p.y += p.vy;
@@ -272,6 +288,7 @@ function update() {
   }
 
   if (gameState === "exploding") {
+
     explosionTime--;
 
     if (explosionTime <= 0) {
@@ -296,6 +313,7 @@ function drawRoad() {
   ctx.lineDashOffset = -roadOffset;
 
   for (let i = 1; i < LANES; i++) {
+
     ctx.beginPath();
     ctx.moveTo(laneWidth * i, 0);
     ctx.lineTo(laneWidth * i, canvas.height);
@@ -318,6 +336,7 @@ function drawCar() {
   ctx.rotate(car.angle);
 
   ctx.fillStyle = "#ff1e1e";
+
   ctx.fillRect(
     -car.width / 2,
     -car.height / 2,
@@ -326,6 +345,7 @@ function drawCar() {
   );
 
   ctx.fillStyle = "#9be7ff";
+
   ctx.fillRect(
     -car.width / 2 + 5,
     -car.height / 2 + 12,
@@ -383,8 +403,6 @@ function drawParticles() {
 function drawScore() {
 
   ctx.fillStyle = "white";
-
-  // SLIGHTLY SMALLER TEXT
   ctx.font = "15px Arial";
 
   // SCORE TOP LEFT
@@ -440,7 +458,7 @@ setInterval(() => {
 
 }, 500);
 
-// COINS
+// COIN LOOP
 function coinLoop() {
 
   if (gameState === "playing") {
@@ -460,7 +478,6 @@ setInterval(() => {
 
     score += 1;
 
-    // UPDATE HIGH SCORE
     if (score > highScore) {
       highScore = score;
       localStorage.setItem("highScore", highScore);
