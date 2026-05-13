@@ -64,9 +64,11 @@ let lastLane = -1;
 
 // RESET
 function resetGame() {
+
   gameState = "playing";
   explosionTime = 0;
   score = 0;
+
   enemies = [];
   coins = [];
   particles = [];
@@ -83,12 +85,21 @@ function resetGame() {
 
 // SPEED RANDOMIZER
 function generateUniqueSpeed(existingSpeeds) {
+
+  // TRAFFIC SPEED RANGE INCREASES EVERY 500 SCORE
+  const speedIncrease = Math.floor(score / 500) * 0.5;
+
+  const minSpeed = 5 + speedIncrease;
+  const maxSpeed = 7.5 + speedIncrease;
+
   let speed;
   let tries = 0;
 
   do {
-    speed = 5 + Math.random() * 2.5;
+
+    speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
     tries++;
+
   } while (
     existingSpeeds.some(s => Math.abs(s - speed) < 0.5) &&
     tries < 10
@@ -172,7 +183,7 @@ function update() {
 
   if (gameState !== "playing") return;
 
-  // SPEED INCREASES EVERY 500 SCORE
+  // ROAD SPEED INCREASES EVERY 500 SCORE
   roadSpeed = 4 + Math.floor(score / 500) * 0.5;
 
   roadOffset += roadSpeed;
@@ -237,13 +248,21 @@ function update() {
       car.y < enemy.y + enemy.height &&
       car.y + car.height > enemy.y
     ) {
+
       gameState = "exploding";
-      explode(car.x + car.width / 2, car.y + car.height / 2);
+
+      explode(
+        car.x + car.width / 2,
+        car.y + car.height / 2
+      );
+
       explosionTime = 30;
     }
   }
 
-  enemies = enemies.filter(e => e.y < canvas.height + 150);
+  enemies = enemies.filter(
+    e => e.y < canvas.height + 150
+  );
 
   // COINS
   for (let i = 0; i < coins.length; i++) {
@@ -270,23 +289,30 @@ function update() {
     }
   }
 
-  coins = coins.filter(c => c.y < canvas.height + 50);
+  coins = coins.filter(
+    c => c.y < canvas.height + 50
+  );
 
   // PARTICLES
   for (let p of particles) {
+
     p.x += p.vx;
     p.y += p.vy;
     p.life--;
   }
 
-  particles = particles.filter(p => p.life > 0);
+  particles = particles.filter(
+    p => p.life > 0
+  );
 
   // UPDATE HIGH SCORE
   if (score > highScore) {
+
     highScore = score;
     localStorage.setItem("highScore", highScore);
   }
 
+  // EXPLOSION TIMER
   if (gameState === "exploding") {
 
     explosionTime--;
@@ -300,13 +326,21 @@ function update() {
 // ROAD
 function drawRoad() {
 
-  let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  let grad = ctx.createLinearGradient(
+    0, 0, 0, canvas.height
+  );
 
   grad.addColorStop(0, "#2b2b2b");
   grad.addColorStop(1, "#121212");
 
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
 
   ctx.strokeStyle = "rgba(255,255,255,0.7)";
   ctx.setLineDash([20, 18]);
@@ -315,8 +349,10 @@ function drawRoad() {
   for (let i = 1; i < LANES; i++) {
 
     ctx.beginPath();
+
     ctx.moveTo(laneWidth * i, 0);
     ctx.lineTo(laneWidth * i, canvas.height);
+
     ctx.stroke();
   }
 
@@ -362,17 +398,47 @@ function drawEnemies() {
   for (let e of enemies) {
 
     ctx.fillStyle = e.color;
-    ctx.fillRect(e.x, e.y, e.width, e.height);
+
+    ctx.fillRect(
+      e.x,
+      e.y,
+      e.width,
+      e.height
+    );
 
     ctx.fillStyle = "#111";
-    ctx.fillRect(e.x + 4, e.y + 10, e.width - 8, 14);
+
+    ctx.fillRect(
+      e.x + 4,
+      e.y + 10,
+      e.width - 8,
+      14
+    );
 
     ctx.fillStyle = "#cfefff";
-    ctx.fillRect(e.x + 6, e.y + 12, e.width - 12, 10);
+
+    ctx.fillRect(
+      e.x + 6,
+      e.y + 12,
+      e.width - 12,
+      10
+    );
 
     ctx.fillStyle = "yellow";
-    ctx.fillRect(e.x + 3, e.y + e.height - 8, 5, 5);
-    ctx.fillRect(e.x + e.width - 8, e.y + e.height - 8, 5, 5);
+
+    ctx.fillRect(
+      e.x + 3,
+      e.y + e.height - 8,
+      5,
+      5
+    );
+
+    ctx.fillRect(
+      e.x + e.width - 8,
+      e.y + e.height - 8,
+      5,
+      5
+    );
   }
 }
 
@@ -384,7 +450,15 @@ function drawCoins() {
     ctx.fillStyle = "#ffd700";
 
     ctx.beginPath();
-    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+
+    ctx.arc(
+      c.x,
+      c.y,
+      c.r,
+      0,
+      Math.PI * 2
+    );
+
     ctx.fill();
   }
 }
@@ -395,7 +469,13 @@ function drawParticles() {
   ctx.fillStyle = "orange";
 
   for (let p of particles) {
-    ctx.fillRect(p.x, p.y, 4, 4);
+
+    ctx.fillRect(
+      p.x,
+      p.y,
+      4,
+      4
+    );
   }
 }
 
@@ -406,11 +486,18 @@ function drawScore() {
   ctx.font = "15px Arial";
 
   // SCORE TOP LEFT
-  ctx.fillText("Score: " + score, 10, 22);
+  ctx.fillText(
+    "Score: " + score,
+    10,
+    22
+  );
 
   // HIGH SCORE TOP RIGHT
-  const highScoreText = "High Score: " + highScore;
-  const textWidth = ctx.measureText(highScoreText).width;
+  const highScoreText =
+    "High Score: " + highScore;
+
+  const textWidth =
+    ctx.measureText(highScoreText).width;
 
   ctx.fillText(
     highScoreText,
@@ -422,7 +509,12 @@ function drawScore() {
 // LOOP
 function gameLoop() {
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
 
   drawRoad();
   update();
@@ -436,18 +528,24 @@ function gameLoop() {
 }
 
 // INPUT
-window.addEventListener("keydown", (e) => {
+window.addEventListener(
+  "keydown",
+  (e) => {
 
-  keys[e.key] = true;
+    keys[e.key] = true;
 
-  if (e.key.toLowerCase() === "r") {
-    resetGame();
+    if (e.key.toLowerCase() === "r") {
+      resetGame();
+    }
   }
-});
+);
 
-window.addEventListener("keyup", (e) => {
-  keys[e.key] = false;
-});
+window.addEventListener(
+  "keyup",
+  (e) => {
+    keys[e.key] = false;
+  }
+);
 
 // TRAFFIC SPAWN
 setInterval(() => {
@@ -465,7 +563,9 @@ function coinLoop() {
     spawnCoinColumn();
   }
 
-  const nextTime = 3000 + Math.random() * 5000;
+  const nextTime =
+    3000 + Math.random() * 5000;
+
   setTimeout(coinLoop, nextTime);
 }
 
@@ -479,8 +579,13 @@ setInterval(() => {
     score += 1;
 
     if (score > highScore) {
+
       highScore = score;
-      localStorage.setItem("highScore", highScore);
+
+      localStorage.setItem(
+        "highScore",
+        highScore
+      );
     }
   }
 
